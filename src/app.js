@@ -3,6 +3,7 @@ import cors from 'cors';
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
+import dayjs from "dayjs";
 dotenv.config();
 
 const participantsSchema = joi.object({
@@ -13,13 +14,35 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post('/participants',(req,res)=>{
+const mongoClient = new MongoClient(process.env.MONGO_URI); 
+
+let db;
+mongoClient.connect().then(()=>{
+    db=mongoClient.db("test");
+});
+
+
+
+
+app.post('/participants',async(req,res)=>{
     const participant = req.body;
 
     const validation = participantsSchema.validate(participant,{ abortEarly: false });
     if(validation.error){
-        console.log(validation.error.details.map((detail)=>{return detail.message}));
+        console.error(validation.error.details.map((detail)=>{return detail.message}));
         return res.sendStatus(422);
+    }
+
+    try {
+        const isRepeated = await db.collection("participants").findOne(participant);
+        if(isRepeated){
+            console.error("REPEATED USERNAME");
+            return res.sendStatus(409);
+        }
+        await db.collection('participants').insertOne({...participant,lastStatus:Date.now() });
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
     }
 
     return res.sendStatus(201);
