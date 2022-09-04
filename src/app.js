@@ -89,8 +89,7 @@ app.post('/messages',async (req,res)=>{
         }
         const date = Date.now();
         message.time = dayjs(date).format('HH:mm:ss');
-        console.log(message);
-
+        await db.collection('messages').insertOne(message);
     } catch (error) {
         console.error(error);
         return res.sendStatus(500);
