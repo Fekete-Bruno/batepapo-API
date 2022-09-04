@@ -27,9 +27,39 @@ mongoClient.connect().then(()=>{
     db=mongoClient.db("test");
 });
 
+const collectionP = db.collection('participants');
+const collectionM = db.collection('messages');
+
+const interval = 15000;
+const tenSeconds = 10000;
+
+setInterval(async() => {
+    try {
+        const participants = await collectionP.find().toArray();
+        const date = Date.now();
+        await collectionP.deleteMany({"lastStatus":{$lt:date-tenSeconds}});
+        const oldParticipants = participants.filter((p)=>(p.lastStatus<date-tenSeconds));
+        const messages = [];
+        oldParticipants.forEach(p => {
+            messages.push({
+                from:p.name,
+                to:"Todos",
+                text:"sai da sala...",
+                type:"status",
+                time: dayjs(date).format('HH:mm:ss')
+            });
+        });
+        if(messages.length>0){
+            await collectionM.insertMany(messages);
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}, interval);
+
 app.get('/participants',async (req,res)=>{
     try {
-        const participants = await db.collection("participants").find().toArray();
+        const participants = await collectionP.find().toArray();
         res.send(participants);
     } catch (error) {
         console.error(error);
@@ -37,13 +67,12 @@ app.get('/participants',async (req,res)=>{
     }
 });
 
-
 app.get('/messages',async(req,res)=>{
     const limit = parseInt(req.query.limit);
     const user =  req.headers.user;
 
     try {
-        const allMessages = await db.collection("messages").find().toArray();
+        const allMessages = await collectionM.find().toArray();
         const messages = allMessages.filter((mes)=>{
             if(mes.from===user||mes.to===user||mes.to==="Todos"||mes.type==="message"){
                 return true
@@ -71,14 +100,14 @@ app.post('/participants',async(req,res)=>{
     }
 
     try {
-        const isRepeated = await db.collection("participants").findOne(participant);
+        const isRepeated = await collectionP.findOne(participant);
         if(isRepeated){
             console.error("REPEATED USERNAME");
             return res.sendStatus(409);
         }
         const time = Date.now()
-        await db.collection('participants').insertOne({...participant,lastStatus:time });
-        await db.collection('messages').insertOne({
+        await collectionP.insertOne({...participant,lastStatus:time });
+        await collectionM.insertOne({
             from:participant.name,
             to:'Todos',
             text:'entra na sala...',
@@ -105,14 +134,14 @@ app.post('/messages',async (req,res)=>{
     }
 
     try {
-        const isParticipant = await db.collection("participants").findOne({name: from});
+        const isParticipant = await collectionP.findOne({name: from});
         if(!isParticipant){
             console.error("NOT A PARTICIPANT");
             return res.sendStatus(422);
         }
         const date = Date.now();
         message.time = dayjs(date).format('HH:mm:ss');
-        await db.collection('messages').insertOne(message);
+        await collectionM.insertOne(message);
     } catch (error) {
         console.error(error);
         return res.sendStatus(500);
@@ -121,4 +150,23 @@ app.post('/messages',async (req,res)=>{
     return res.sendStatus(201);
 });
 
+app.post('/status',async(req,res)=>{
+    const user = req.headers.user;
+    try {
+        const participant = await collectionP.findOne({name: user});
+        if(!participant){
+            console.error("NOT A PARTICIPANT");
+            return res.sendStatus(404);
+        }
+        const date = Date.now();
+        await collectionP.updateOne(
+            {name:user},
+            {$set:{lastStatus:date}}
+        );
+        return res.sendStatus(200);
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
 app.listen(5000,()=>console.log("Listening on port 5000..."));
