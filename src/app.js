@@ -9,6 +9,12 @@ dotenv.config();
 const participantsSchema = joi.object({
     name: joi.string().required().min(1)
 });
+const messagesSchema = joi.object({
+    from: joi.string().required().min(1),
+    to: joi.string().required().min(1),
+    text: joi.string().required().min(1),
+    type: joi.string().required().valid("message","private_message")
+});
 
 const app = express();
 app.use(cors());
@@ -21,8 +27,18 @@ mongoClient.connect().then(()=>{
     db=mongoClient.db("test");
 });
 
+app.get('/participants',async (req,res)=>{
+    try {
+        const participants = await db.collection("participants").find().toArray();
+        res.send(participants);
+    } catch (error) {
+        console.error(error);
+        res.sendStatus(500);   
+    }
+});
 
 app.post('/participants',async(req,res)=>{
+    // To-DO: Change to {name}
     const participant = req.body;
 
     const validation = participantsSchema.validate(participant,{ abortEarly: false });
@@ -54,14 +70,35 @@ app.post('/participants',async(req,res)=>{
     return res.sendStatus(201);
 });
 
-app.get('/participants',async (req,res)=>{
+
+app.post('/messages',async (req,res)=>{
+    const from = req.headers.user;
+    const { to, text, type } = req.body;
+    const message = { from, to, text, type };
+    const validation = messagesSchema.validate(message,{ abortEarly: false });
+    if(validation.error){
+        console.error(validation.error.details.map((detail)=>{return detail.message}));
+        return res.sendStatus(422);
+    }
+
     try {
-        const participants = await db.collection("participants").find().toArray();
-        res.send(participants);
+        const isParticipant = await db.collection("participants").findOne({name: from});
+        if(!isParticipant){
+            console.error("NOT A PARTICIPANT");
+            return res.sendStatus(422);
+        }
+        const date = Date.now();
+        message.time = dayjs(date).format('HH:mm:ss');
+        console.log(message);
+
     } catch (error) {
         console.error(error);
-        res.sendStatus(500);   
+        return res.sendStatus(500);
     }
+
+    return res.sendStatus(201);
+
 });
+
 
 app.listen(5000,()=>console.log("Listening on port 5000..."));
