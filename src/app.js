@@ -37,6 +37,29 @@ app.get('/participants',async (req,res)=>{
     }
 });
 
+
+app.get('/messages',async(req,res)=>{
+    const limit = parseInt(req.query.limit);
+    const user =  req.headers.user;
+
+    try {
+        const allMessages = await db.collection("messages").find().toArray();
+        const messages = allMessages.filter((mes)=>{
+            if(mes.from===user||mes.to===user||mes.to==="Todos"||mes.type==="message"){
+                return true
+            }
+        });
+        if(limit){
+            messages.reverse();
+            return res.send(messages.filter((e,index)=>{return index<limit;}).reverse());
+        }
+        return res.send(messages);
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+});
+
 app.post('/participants',async(req,res)=>{
     // To-DO: Change to {name}
     const participant = req.body;
@@ -96,8 +119,6 @@ app.post('/messages',async (req,res)=>{
     }
 
     return res.sendStatus(201);
-
 });
-
 
 app.listen(5000,()=>console.log("Listening on port 5000..."));
