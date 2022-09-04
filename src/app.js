@@ -6,9 +6,7 @@ import joi from "joi";
 import dayjs from "dayjs";
 dotenv.config();
 
-const participantsSchema = joi.object({
-    name: joi.string().required().min(1)
-});
+const participantSchema = joi.object({name:joi.string().required().min(1)});
 const messagesSchema = joi.object({
     from: joi.string().required().min(1),
     to: joi.string().required().min(1),
@@ -23,12 +21,14 @@ app.use(express.json());
 const mongoClient = new MongoClient(process.env.MONGO_URI); 
 
 let db;
+let collectionM;
+let collectionP
 mongoClient.connect().then(()=>{
     db=mongoClient.db("test");
+    collectionP = db.collection('participants');
+    collectionM = db.collection('messages');
 });
 
-const collectionP = db.collection('participants');
-const collectionM = db.collection('messages');
 
 const interval = 15000;
 const tenSeconds = 10000;
@@ -90,14 +90,18 @@ app.get('/messages',async(req,res)=>{
 });
 
 app.post('/participants',async(req,res)=>{
-    // To-DO: Change to {name}
-    const participant = req.body;
+    
+    const { name } = req.body;
+    const participant = { name };
 
-    const validation = participantsSchema.validate(participant,{ abortEarly: false });
+    
+
+    const validation = participantSchema.validate(participant,{ abortEarly: false });
     if(validation.error){
         console.error(validation.error.details.map((detail)=>{return detail.message}));
         return res.sendStatus(422);
     }
+
 
     try {
         const isRepeated = await collectionP.findOne(participant);
