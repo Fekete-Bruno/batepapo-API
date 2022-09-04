@@ -22,8 +22,6 @@ mongoClient.connect().then(()=>{
 });
 
 
-
-
 app.post('/participants',async(req,res)=>{
     const participant = req.body;
 
@@ -39,7 +37,15 @@ app.post('/participants',async(req,res)=>{
             console.error("REPEATED USERNAME");
             return res.sendStatus(409);
         }
-        await db.collection('participants').insertOne({...participant,lastStatus:Date.now() });
+        const time = Date.now()
+        await db.collection('participants').insertOne({...participant,lastStatus:time });
+        await db.collection('messages').insertOne({
+            from:participant.name,
+            to:'Todos',
+            text:'entra na sala...',
+            type:'status',
+            time:dayjs(time).format('HH:mm:ss'),
+        });
     } catch (error) {
         console.error(error);
         return res.sendStatus(500);
