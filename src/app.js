@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -57,6 +57,29 @@ setInterval(async() => {
         console.error(error);
     }
 }, interval);
+
+app.delete('/messages/:messageId',async(req,res)=>{
+    const userReq =  req.headers.user;
+    const user = stripHtml(userReq).result.trim();
+    const messageId = req.params.messageId;
+    try {
+        const message = await collectionM.find({_id: ObjectId(messageId)}).toArray();
+        if(!message){
+            console.log('404')
+            return res.sendStatus(404);
+        }
+        if(message[0].from!==user){
+            return res.sendStatus(401);
+        }
+        await collectionM.deleteOne({"_id": ObjectId(messageId)});
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+
+    return res.sendStatus(200);
+
+});
 
 app.get('/participants',async (req,res)=>{
     try {
