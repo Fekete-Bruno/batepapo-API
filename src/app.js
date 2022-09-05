@@ -151,6 +151,8 @@ app.post('/messages',async (req,res)=>{
     const from = req.headers.user;
     const { to, text, type } = req.body;
 
+    console.log(from);
+
     const fromStrip = stripHtml(from).result.trim();
     const toStrip = stripHtml(to).result.trim();
     const textStrip = stripHtml(text).result.trim();
@@ -164,7 +166,7 @@ app.post('/messages',async (req,res)=>{
     }
 
     try {
-        const isParticipant = await collectionP.findOne({name: from});
+        const isParticipant = await collectionP.findOne({name: fromStrip});
         if(!isParticipant){
             console.error("NOT A PARTICIPANT");
             return res.sendStatus(422);
@@ -199,6 +201,47 @@ app.post('/status',async(req,res)=>{
         console.error(error);
         return res.sendStatus(500);
     }
+});
+
+app.put("/messages/:messageId",async(req,res)=>{
+    const { to, text, type } = req.body;
+    const userReq = req.headers.user;
+    const user = stripHtml(userReq).result.trim();
+
+    const messageId = req.params.messageId;
+
+    const toStrip = stripHtml(to).result.trim();
+    const textStrip = stripHtml(text).result.trim();
+    const typeStrip = stripHtml(type).result.trim();
+
+    const newMessage = { from:user, to:toStrip, text:textStrip, type:typeStrip };
+    const validation = messagesSchema.validate(newMessage,{ abortEarly: false });
+    if(validation.error){
+        console.error(validation.error.details.map((detail)=>{return detail.message}));
+        return res.sendStatus(422);
+    }
+
+    try {
+        const isParticipant = await collectionP.findOne({name: user});
+        if(!isParticipant){
+            console.error("NOT A PARTICIPANT");
+            return res.sendStatus(422);
+        }
+        const message = await collectionM.find({_id: ObjectId(messageId)}).toArray();
+        if(!message){
+            console.log('404')
+            return res.sendStatus(404);
+        }
+        if(message[0].from!==user){
+            return res.sendStatus(401);
+        }
+        await collectionM.updateOne ({"_id": ObjectId(messageId)},{$set:{"to":toStrip,"text":textStrip,"type":typeStrip}});
+
+    } catch (error) {
+        console.error(error);
+        return res.sendStatus(500);
+    }
+
 });
 
 app.listen(5000,()=>console.log("Listening on port 5000..."));
