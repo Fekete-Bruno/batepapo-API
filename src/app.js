@@ -4,6 +4,7 @@ import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
+import { stripHtml } from 'string-strip-html';
 dotenv.config();
 
 const participantSchema = joi.object({name:joi.string().required().min(1)});
@@ -69,8 +70,8 @@ app.get('/participants',async (req,res)=>{
 
 app.get('/messages',async(req,res)=>{
     const limit = parseInt(req.query.limit);
-    const user =  req.headers.user;
-
+    const userReq =  req.headers.user;
+    const user = stripHtml(userReq).result.trim();
     try {
         const allMessages = await collectionM.find().toArray();
         const messages = allMessages.filter((mes)=>{
@@ -90,18 +91,15 @@ app.get('/messages',async(req,res)=>{
 });
 
 app.post('/participants',async(req,res)=>{
-    
     const { name } = req.body;
-    const participant = { name };
-
-    
+    const nameStrip = stripHtml(name).result.trim();
+    const participant = { name:nameStrip }
 
     const validation = participantSchema.validate(participant,{ abortEarly: false });
     if(validation.error){
         console.error(validation.error.details.map((detail)=>{return detail.message}));
         return res.sendStatus(422);
     }
-
 
     try {
         const isRepeated = await collectionP.findOne(participant);
@@ -126,11 +124,16 @@ app.post('/participants',async(req,res)=>{
     return res.sendStatus(201);
 });
 
-
 app.post('/messages',async (req,res)=>{
     const from = req.headers.user;
     const { to, text, type } = req.body;
-    const message = { from, to, text, type };
+
+    const fromStrip = stripHtml(from).result.trim();
+    const toStrip = stripHtml(to).result.trim();
+    const textStrip = stripHtml(text).result.trim();
+    const typeStrip = stripHtml(type).result.trim();
+
+    const message = { from:fromStrip, to:toStrip, text:textStrip, type:typeStrip };
     const validation = messagesSchema.validate(message,{ abortEarly: false });
     if(validation.error){
         console.error(validation.error.details.map((detail)=>{return detail.message}));
@@ -155,7 +158,8 @@ app.post('/messages',async (req,res)=>{
 });
 
 app.post('/status',async(req,res)=>{
-    const user = req.headers.user;
+    const userReq = req.headers.user;
+    const user = stripHtml(userReq).result.trim();
     try {
         const participant = await collectionP.findOne({name: user});
         if(!participant){
@@ -173,4 +177,5 @@ app.post('/status',async(req,res)=>{
         return res.sendStatus(500);
     }
 });
+
 app.listen(5000,()=>console.log("Listening on port 5000..."));
